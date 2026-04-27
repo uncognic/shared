@@ -34,7 +34,7 @@ volumes:
 ```bash
 curl -X POST https://shared.example.com/upload \
  -H "Authorization: Bearer TOKEN_HERE" \
- -F "file=@/PATH/TO/FILE"
+ -F "file=@/PATH/TO/FILE" | jq
  ```
  
 You will receive the link to download it in a format like this:
@@ -52,4 +52,9 @@ You will receive the link to download it in a format like this:
 You can download it back like this:
 ```bash
 curl https://shared.example.com/f/some_id -o file.txt
+```
+
+You can list files like this:
+```bash
+curl http://localhost:32768/list -H "Authorization: Bearer CHANGE_ME" | jq
 ```
