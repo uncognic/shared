@@ -40,8 +40,8 @@ inspired by the great 0x0.st
 licensed under the GNU AGPL v3 license <https://fsf.org/>
 https://github.com/uncognic/shared
 
-UPLOAD
-  curl -X POST https://files.example.com/upload \
+UPLOAD (remove ?ttl= for no expiry)
+  curl -X POST https://files.example.com/upload?ttl=<N[s|m|h|d]> \
     -H "Authorization: Bearer <token>" \
     -F "file=@/path/to/file" | jq
 

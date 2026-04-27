@@ -13,6 +13,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 builder.Services.AddSingleton<FileService>();
 builder.Services.AddSingleton<TokenService>();
+builder.Services.AddHostedService<ExpiryService>();
 builder.WebHost.ConfigureKestrel(options =>
 {
     var maxSize = builder.Configuration.GetValue<long>("FileSharing:MaxFileSizeBytes", 524_288_000);
@@ -50,7 +51,14 @@ app.MapPost("/upload", async (HttpContext ctx, FileService fs) =>
         return Results.BadRequest("No file provided.");
 
     var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-    var record = await fs.SaveAsync(file, ip);
+    TimeSpan? ttl = null;
+    if (ctx.Request.Query.TryGetValue("ttl", out var ttlStr))
+    {
+        ttl = ParseTtl(ttlStr.ToString());
+    }
+        
+
+    var record = await fs.SaveAsync(file, ip, ttl);
     var baseUrl = app.Configuration["FileSharing:BaseUrl"]?.TrimEnd('/');
     var link = $"{baseUrl}/f/{record.Id}";
 
@@ -61,7 +69,8 @@ app.MapPost("/upload", async (HttpContext ctx, FileService fs) =>
         record.OriginalName,
         record.MimeType,
         record.SizeBytes,
-        record.UploadedAt
+        record.UploadedAt,
+        record.ExpiresAt
     });
 });
 
@@ -107,8 +116,8 @@ app.MapGet("/", () =>
         $"licensed under the GNU AGPL v3 license <https://fsf.org/>\n" +
         $"https://github.com/uncognic/shared\n" +
         $"\n" +
-        $"UPLOAD\n" +
-        $"  curl -X POST {baseUrl}/upload \\\n" +
+        $"UPLOAD (remove ?ttl= for no expiry)\n" +
+        $"  curl -X POST {baseUrl}/upload?ttl=<N[s|m|h|d]> \\\n" +
         $"    -H \"Authorization: Bearer <token>\" \\\n" +
         $"    -F \"file=@/path/to/file\" | jq\n" +
         $"\n" +
@@ -122,6 +131,21 @@ app.MapGet("/", () =>
         $"    -H \"Authorization: Bearer <token>\"\n";
     return Results.Text(text, "text/plain");
 });
+
+TimeSpan? ParseTtl(string s)
+{
+    if (string.IsNullOrEmpty(s)) return null;
+    var unit = s[^1];
+    if (!int.TryParse(s[..^1], out var value) || value <= 0) return null;
+    return unit switch
+    {
+        's' => TimeSpan.FromSeconds(value),
+        'm' => TimeSpan.FromMinutes(value),
+        'h' => TimeSpan.FromHours(value),
+        'd' => TimeSpan.FromDays(value),
+        _ => null
+    };
+}
 
 
 app.Run();

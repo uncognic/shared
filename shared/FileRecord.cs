@@ -8,4 +8,5 @@ public class FileRecord
     public long SizeBytes { get; set; }
     public string UploaderIp { get; set; } = string.Empty;
     public DateTime UploadedAt { get; set; }
+    public DateTime? ExpiresAt { get; set; }
 }

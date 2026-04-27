@@ -30,12 +30,13 @@ public class FileService
             MimeType TEXT NOT NULL,
             SizeBytes INTEGER NOT NULL,
             UploaderIp TEXT NOT NULL,
-            UploadedAt TEXT NOT NULL)
+            UploadedAt TEXT NOT NULL,
+            ExpiresAt TEXT)
             """);
 
     }
 
-    public async Task<FileRecord> SaveAsync(IFormFile file, string uploaderIp)
+    public async Task<FileRecord> SaveAsync(IFormFile file, string uploaderIp, TimeSpan? ttl = null)
     {
         var id = Guid.NewGuid().ToString("N");
         var destPath = Path.Combine(_storage_path, id);
@@ -52,21 +53,23 @@ public class FileService
             MimeType = file.ContentType,
             SizeBytes = file.Length,
             UploaderIp = uploaderIp,
-            UploadedAt = DateTime.UtcNow
+            UploadedAt = DateTime.UtcNow,
+            ExpiresAt = ttl.HasValue ? DateTime.UtcNow.Add(ttl.Value) : null
         };
 
         using var connection = new SqliteConnection(ConnectionString);
         await connection.ExecuteAsync("""
-            INSERT INTO Files (Id, OriginalName, MimeType, SizeBytes, UploaderIp, UploadedAt)
-            VALUES (@Id, @OriginalName, @MimeType, @SizeBytes, @UploaderIp, @UploadedAt)
-            """, new
+                                      INSERT INTO Files (Id, OriginalName, MimeType, SizeBytes, UploaderIp, UploadedAt, ExpiresAt)
+                                      VALUES (@Id, @OriginalName, @MimeType, @SizeBytes, @UploaderIp, @UploadedAt, @ExpiresAt)
+                                      """, new
         {
-            record.Id,
-            record.OriginalName,
-            record.MimeType,
-            record.SizeBytes,
-            record.UploaderIp,
-            UploadedAt = record.UploadedAt.ToString("O")
+            Id = record.Id,
+            OriginalName = record.OriginalName,
+            MimeType = record.MimeType,
+            SizeBytes = record.SizeBytes,
+            UploaderIp = record.UploaderIp,
+            UploadedAt = record.UploadedAt.ToString("O"),
+            ExpiresAt = record.ExpiresAt?.ToString("O")
         });
 
         return record;
@@ -81,6 +84,11 @@ public class FileService
             return (null, null);
         }
 
+        if (record.ExpiresAt.HasValue && record.ExpiresAt.Value <= DateTime.UtcNow)
+        {
+            return (null, null);
+        }
+        
         var filePath = Path.Combine(_storage_path, id);
         return File.Exists(filePath) ? (record, filePath) : (null, null);
     }
@@ -106,5 +114,25 @@ public class FileService
 
         await conn.ExecuteAsync("DELETE FROM Files WHERE Id = @Id", new { Id = id });
         return true;
+    }
+
+    public async Task<int> DeleteExpiredAsync()
+    {
+        using var conn = new SqliteConnection(ConnectionString);
+        var expired = await conn.QueryAsync<FileRecord>(
+            "SELECT * FROM Files WHERE ExpiresAt IS NOT NULL AND ExpiresAt <= @Now",
+            new { Now = DateTime.UtcNow.ToString("O") });
+
+        int count = 0;
+        foreach (var record in expired)
+        {
+            var filePath = Path.Combine(_storage_path, record.Id);
+            if (File.Exists(filePath))
+                File.Delete(filePath);
+
+            await conn.ExecuteAsync("DELETE FROM Files WHERE Id = @Id", new { record.Id });
+            count++;
+        }
+        return count;
     }
 }
