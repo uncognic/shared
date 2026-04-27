@@ -30,7 +30,28 @@ volumes:
 ```
 
 ## Usage
+You can find some basic instructions by cURLing the base URL:
+```bash
+curl https://shared.example.com
+```
+```
+shared - simple file sharing
+inspired by the great 0x0.st
+https://github.com/uncognic/shared
 
+UPLOAD
+  curl -X POST https://files.example.com/upload \
+    -H "Authorization: Bearer <token>" \
+    -F "file=@/path/to/file" | jq
+
+DOWNLOAD
+  curl https://files.example.com/f/<id>
+
+LISTING
+  curl https://files.example.com/list -H "Authorization: Bearer <token>" | jq
+```
+
+Upload:
 ```bash
 curl -X POST https://shared.example.com/upload \
  -H "Authorization: Bearer TOKEN_HERE" \

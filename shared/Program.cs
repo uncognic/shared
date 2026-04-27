@@ -88,4 +88,26 @@ app.MapGet("/list", async (HttpContext ctx, FileService fs) =>
     return Results.Ok(files);
 });
 
+// GET / (about?
+app.MapGet("/", () =>
+{
+    var baseUrl = app.Configuration["FileSharing:BaseUrl"]?.TrimEnd('/') ?? "https://example.com";
+    var text =
+        $"shared - simple file sharing\n" +
+        $"inspired by the great 0x0.st\n" +
+        $"https://github.com/uncognic/shared\n" +
+        $"\n" +
+        $"UPLOAD\n" +
+        $"  curl -X POST {baseUrl}/upload \\\n" +
+        $"    -H \"Authorization: Bearer <token>\" \\\n" +
+        $"    -F \"file=@/path/to/file\" | jq\n" +
+        $"\n" +
+        $"DOWNLOAD\n" +
+        $"  curl {baseUrl}/f/<id>\n\n" +
+        $"LISTING\n" +
+        $"  curl {baseUrl}/list -H \"Authorization: Bearer <token>\" | jq\n";
+    return Results.Text(text, "text/plain");
+});
+
+
 app.Run();
