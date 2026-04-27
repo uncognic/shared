@@ -12,6 +12,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 
 builder.Services.AddSingleton<FileService>();
+builder.Services.AddSingleton<TokenService>();
 builder.WebHost.ConfigureKestrel(options =>
 {
     var maxSize = builder.Configuration.GetValue<long>("FileSharing:MaxFileSizeBytes", 524_288_000);
@@ -19,25 +20,24 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 var app = builder.Build();
+app.Services.GetRequiredService<TokenService>();
 app.UseForwardedHeaders();
 
 // auth
-bool IsAuthorized(HttpContext ctx)
+async Task<bool> IsAuthorized(HttpContext ctx)
 {
-    var expected = app.Configuration["FileSharing:BearerToken"];
-    if (string.IsNullOrEmpty(expected))
-    {
-        return false;
-    }
-
-    return ctx.Request.Headers.Authorization.ToString() == $"Bearer {expected}";
+    var tokenService = ctx.RequestServices.GetRequiredService<TokenService>();
+    var header = ctx.Request.Headers.Authorization.ToString();
+    if (!header.StartsWith("Bearer ")) return false;
+    var token = header["Bearer ".Length..].Trim();
+    return await tokenService.IsValidAsync(token);
 }
 
 // POST /upload
 
 app.MapPost("/upload", async (HttpContext ctx, FileService fs) =>
 {
-    if (!IsAuthorized(ctx))
+    if (!await IsAuthorized(ctx))
         return Results.Unauthorized();
 
     if (!ctx.Request.HasFormContentType)
@@ -81,7 +81,7 @@ app.MapGet("/f/{id}", async (string id, FileService fs) =>
 // GET /list (auth)
 app.MapGet("/list", async (HttpContext ctx, FileService fs) =>
 {
-    if (!IsAuthorized(ctx))
+    if (!await IsAuthorized(ctx))
         return Results.Unauthorized();
 
     var files = await fs.ListAsync();

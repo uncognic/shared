@@ -13,7 +13,6 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - FileSharing__BaseUrl=https://files.example.com
       - FileSharing__StoragePath=/app/shared
-      - FileSharing__BearerToken=CHANGE_ME
       - FileSharing__MaxFileSizeBytes=524288000
 
 volumes:

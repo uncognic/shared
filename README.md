@@ -17,16 +17,15 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - shared:/app/filestore
+      - shared:/app/shared
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - FileSharing__BaseUrl=https://files.example.com
-      - FileSharing__StoragePath=./filestore
-      - FileSharing__BearerToken=CHANGE_ME
+      - FileSharing__StoragePath=/app/shared
       - FileSharing__MaxFileSizeBytes=524288000
 
 volumes:
-  filestore:
+  shared:
 ```
 
 ## Usage

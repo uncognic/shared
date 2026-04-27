@@ -8,20 +8,21 @@ namespace shared.Services;
 public class FileService
 {
     private readonly string _storage_path;
-    private readonly string _connectionString;
+    public string ConnectionString { get; private set; } = string.Empty;
+
 
     public FileService(IConfiguration configuration)
     {
         _storage_path = configuration["FileSharing:StoragePath"] ?? throw new InvalidOperationException("FileSharing:StoragePath configuration is missing.");
         Directory.CreateDirectory(_storage_path);
         var dbPath = Path.Combine(_storage_path, "shared.db");
-        _connectionString = $"Data Source={dbPath}";
+        ConnectionString = $"Data Source={dbPath}";
         InitDb();
     }
 
     private void InitDb()
     {
-        using var connection = new SqliteConnection(_connectionString);
+        using var connection = new SqliteConnection(ConnectionString);
         connection.Execute("""
             CREATE TABLE IF NOT EXISTS Files (
             Id TEXT PRIMARY KEY,
@@ -54,7 +55,7 @@ public class FileService
             UploadedAt = DateTime.UtcNow
         };
 
-        using var connection = new SqliteConnection(_connectionString);
+        using var connection = new SqliteConnection(ConnectionString);
         await connection.ExecuteAsync("""
             INSERT INTO Files (Id, OriginalName, MimeType, SizeBytes, UploaderIp, UploadedAt)
             VALUES (@Id, @OriginalName, @MimeType, @SizeBytes, @UploaderIp, @UploadedAt)
@@ -73,7 +74,7 @@ public class FileService
 
     public async Task<(FileRecord? Record, string? FilePath)> GetAsync(string id)
     {
-        using var connection = new SqliteConnection(_connectionString);
+        using var connection = new SqliteConnection(ConnectionString);
         var record = await connection.QuerySingleOrDefaultAsync<FileRecord>("SELECT * FROM Files WHERE Id = @Id", new { Id = id });
         if (record is null)
         { 
@@ -86,7 +87,7 @@ public class FileService
 
     public async Task<IEnumerable<FileRecord>> ListAsync()
     {
-        using var connection = new SqliteConnection(_connectionString);
+        using var connection = new SqliteConnection(ConnectionString);
         return await connection.QueryAsync<FileRecord>("SELECT * FROM Files ORDER BY UploadedAt DESC");
     }
 }
