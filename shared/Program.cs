@@ -88,13 +88,23 @@ app.MapGet("/list", async (HttpContext ctx, FileService fs) =>
     return Results.Ok(files);
 });
 
+app.MapDelete("/f/{id}", async (string id, HttpContext ctx, FileService fs) =>
+{
+    if (!await IsAuthorized(ctx))
+        return Results.Unauthorized();
+
+    var deleted = await fs.DeleteAsync(id);
+    return deleted ? Results.Ok() : Results.NotFound();
+});
+
 // GET / (about?
 app.MapGet("/", () =>
 {
     var baseUrl = app.Configuration["FileSharing:BaseUrl"]?.TrimEnd('/') ?? "https://example.com";
     var text =
         $"shared - simple file sharing\n" +
-        $"inspired by the great 0x0.st\n" +
+        $"inspired by the great 0x0.st\n\n" +
+        $"licensed under the GNU AGPL v3 license <https://fsf.org/>\n" +
         $"https://github.com/uncognic/shared\n" +
         $"\n" +
         $"UPLOAD\n" +
@@ -105,7 +115,11 @@ app.MapGet("/", () =>
         $"DOWNLOAD\n" +
         $"  curl {baseUrl}/f/<id>\n\n" +
         $"LISTING\n" +
-        $"  curl {baseUrl}/list -H \"Authorization: Bearer <token>\" | jq\n";
+        $"  curl {baseUrl}/list -H \"Authorization: Bearer <token>\" | jq\n"+
+        $"\n" +
+        $"DELETE\n" +
+        $"  curl -X DELETE {baseUrl}/f/<id> \\\n" +
+        $"    -H \"Authorization: Bearer <token>\"\n";
     return Results.Text(text, "text/plain");
 });
 

@@ -90,4 +90,21 @@ public class FileService
         using var connection = new SqliteConnection(ConnectionString);
         return await connection.QueryAsync<FileRecord>("SELECT * FROM Files ORDER BY UploadedAt DESC");
     }
+
+    public async Task<bool> DeleteAsync(string id)
+    {
+        using var conn = new SqliteConnection(ConnectionString);
+        var record = await conn.QuerySingleOrDefaultAsync<FileRecord>(
+            "SELECT * FROM Files WHERE Id = @Id", new { Id = id });
+
+        if (record is null)
+            return false;
+
+        var filePath = Path.Combine(_storage_path, id);
+        if (File.Exists(filePath))
+            File.Delete(filePath);
+
+        await conn.ExecuteAsync("DELETE FROM Files WHERE Id = @Id", new { Id = id });
+        return true;
+    }
 }
