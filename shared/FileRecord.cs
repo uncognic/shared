@@ -9,4 +9,5 @@ public class FileRecord
     public string UploaderIp { get; set; } = string.Empty;
     public DateTime UploadedAt { get; set; }
     public DateTime? ExpiresAt { get; set; }
+    public string TokenLabel { get; set; } = string.Empty;
 }

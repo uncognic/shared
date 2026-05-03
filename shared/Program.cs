@@ -97,7 +97,7 @@ async Task<bool> IsAuthorized(HttpContext ctx)
 
 // POST /upload
 
-app.MapPost("/upload", async (HttpContext ctx, FileService fs) =>
+app.MapPost("/upload", async (HttpContext ctx, FileService fs, TokenService tokenService) =>
 {
     if (!await IsAuthorized(ctx))
     {
@@ -120,9 +120,11 @@ app.MapPost("/upload", async (HttpContext ctx, FileService fs) =>
     {
         ttl = ParseTtl(ttlStr.ToString());
     }
-        
 
-    var record = await fs.SaveAsync(file, ip, ttl);
+    var token = ctx.Request.Headers.Authorization.ToString()["Bearer ".Length..].Trim();
+    var tokenLabel = await tokenService.GetLabelAsync(token) ?? "unknown";
+    var record = await fs.SaveAsync(file, ip, tokenLabel, ttl);
+
     Log.Information("Upload: {OriginalName} ({Size} bytes) from {Ip}, expires {ExpiresAt}",
         record.OriginalName, record.SizeBytes, ip, record.ExpiresAt?.ToString("O") ?? "never");
     var baseUrl = app.Configuration["FileSharing:BaseUrl"]?.TrimEnd('/');

@@ -97,4 +97,12 @@ public class TokenService
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
+
+    public async Task<string?> GetLabelAsync(string token)
+    {
+        var hash = Hash(token);
+        using var conn = new SqliteConnection(_connectionString);
+        return await conn.QuerySingleOrDefaultAsync<string>(
+            "SELECT Label FROM Tokens WHERE Hash = @Hash", new { Hash = hash });
+    }
 }

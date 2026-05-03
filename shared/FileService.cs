@@ -31,12 +31,13 @@ public class FileService
             SizeBytes INTEGER NOT NULL,
             UploaderIp TEXT NOT NULL,
             UploadedAt TEXT NOT NULL,
-            ExpiresAt TEXT)
+            ExpiresAt TEXT,
+            TokenLabel TEXT NOT NULL DEFAULT '')
             """);
 
     }
 
-    public async Task<FileRecord> SaveAsync(IFormFile file, string uploaderIp, TimeSpan? ttl = null)
+    public async Task<FileRecord> SaveAsync(IFormFile file, string uploaderIp, string tokenLabel, TimeSpan? ttl = null)
     {
         var id = Guid.NewGuid().ToString("N");
         var destPath = Path.Combine(_storage_path, id);
@@ -54,13 +55,14 @@ public class FileService
             SizeBytes = file.Length,
             UploaderIp = uploaderIp,
             UploadedAt = DateTime.UtcNow,
-            ExpiresAt = ttl.HasValue ? DateTime.UtcNow.Add(ttl.Value) : null
+            ExpiresAt = ttl.HasValue ? DateTime.UtcNow.Add(ttl.Value) : null,
+            TokenLabel = tokenLabel,
         };
 
         using var connection = new SqliteConnection(ConnectionString);
         await connection.ExecuteAsync("""
-                                      INSERT INTO Files (Id, OriginalName, MimeType, SizeBytes, UploaderIp, UploadedAt, ExpiresAt)
-                                      VALUES (@Id, @OriginalName, @MimeType, @SizeBytes, @UploaderIp, @UploadedAt, @ExpiresAt)
+                                      INSERT INTO Files (Id, OriginalName, MimeType, SizeBytes, UploaderIp, UploadedAt, ExpiresAt, TokenLabel)
+                                      VALUES (@Id, @OriginalName, @MimeType, @SizeBytes, @UploaderIp, @UploadedAt, @ExpiresAt, @TokenLabel)
                                       """, new
         {
             Id = record.Id,
@@ -69,7 +71,8 @@ public class FileService
             SizeBytes = record.SizeBytes,
             UploaderIp = record.UploaderIp,
             UploadedAt = record.UploadedAt.ToString("O"),
-            ExpiresAt = record.ExpiresAt?.ToString("O")
+            ExpiresAt = record.ExpiresAt?.ToString("O"),
+            TokenLabel = record.TokenLabel
         });
 
         return record;
