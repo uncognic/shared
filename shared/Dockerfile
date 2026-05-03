@@ -27,6 +27,10 @@ RUN dotnet publish "./shared.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+# fix permissions
+USER root
+RUN mkdir -p /app/shared && chown -R $APP_UID:$APP_UID /app/shared
+USER $APP_UID
 ARG VERSION=dev
 ENV APP_VERSION=$VERSION
 ENTRYPOINT ["dotnet", "shared.dll"]
