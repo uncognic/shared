@@ -1,8 +1,21 @@
-using shared.Services;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
+using Serilog;
+using shared.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var logPath = Path.Combine(
+    builder.Configuration["FileSharing:StoragePath"] ?? "/app/shared",
+    "logs", "shared-.log");
+
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .WriteTo.Console()
+    .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -39,6 +52,7 @@ app.Use(async (ctx, next) =>
     var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? string.Empty;
     if (await bl.IsBlockedAsync(ip))
     {
+        Log.Warning("Blocked IP {Ip} attempted to access {Path}", ip, ctx.Request.Path);
         ctx.Response.StatusCode = 403;
         return;
     }
@@ -61,7 +75,10 @@ async Task<bool> IsAuthorized(HttpContext ctx)
 app.MapPost("/upload", async (HttpContext ctx, FileService fs) =>
 {
     if (!await IsAuthorized(ctx))
+    {
+        Log.Warning("Unauthorized upload attempt from {Ip}", ctx.Connection.RemoteIpAddress);
         return Results.Unauthorized();
+    }
 
     if (!ctx.Request.HasFormContentType)
         return Results.BadRequest("Expected multipart/form-data.");
@@ -81,6 +98,8 @@ app.MapPost("/upload", async (HttpContext ctx, FileService fs) =>
         
 
     var record = await fs.SaveAsync(file, ip, ttl);
+    Log.Information("Upload: {OriginalName} ({Size} bytes) from {Ip}, expires {ExpiresAt}",
+        record.OriginalName, record.SizeBytes, ip, record.ExpiresAt?.ToString("O") ?? "never");
     var baseUrl = app.Configuration["FileSharing:BaseUrl"]?.TrimEnd('/');
     var link = $"{baseUrl}/f/{record.Id}";
 
@@ -103,7 +122,11 @@ app.MapGet("/f/{id}", async (string id, FileService fs) =>
     var (record, filePath) = await fs.GetAsync(id);
 
     if (record is null || filePath is null)
+    {
+        Log.Warning("Download 404: {Id}", id);
         return Results.NotFound();
+    }
+    Log.Information("Download: {Id} ({OriginalName})", record.Id, record.OriginalName);
 
     var stream = File.OpenRead(filePath);
     return Results.File(stream, record.MimeType, record.OriginalName);
@@ -113,7 +136,12 @@ app.MapGet("/f/{id}", async (string id, FileService fs) =>
 app.MapGet("/list", async (HttpContext ctx, FileService fs) =>
 {
     if (!await IsAuthorized(ctx))
+    {
+        Log.Warning("Unauthorized list attempt from {Ip}", ctx.Connection.RemoteIpAddress);
         return Results.Unauthorized();
+    }
+
+    Log.Information("List requested from {Ip}", ctx.Connection.RemoteIpAddress);
 
     var files = await fs.ListAsync();
     return Results.Ok(files);
@@ -122,9 +150,16 @@ app.MapGet("/list", async (HttpContext ctx, FileService fs) =>
 app.MapDelete("/f/{id}", async (string id, HttpContext ctx, FileService fs) =>
 {
     if (!await IsAuthorized(ctx))
+    {
+        Log.Warning("Unauthorized file delete attempt from {Ip}", ctx.Connection.RemoteIpAddress);
         return Results.Unauthorized();
+    }
 
     var deleted = await fs.DeleteAsync(id);
+    if (deleted)
+        Log.Information("Deleted: {Id}", id);
+    else
+        Log.Warning("Delete 404: {Id}", id);
     return deleted ? Results.Ok() : Results.NotFound();
 });
 
@@ -165,7 +200,10 @@ app.MapGet("/", () =>
 app.MapPost("/blacklist/{ip}", async (string ip, HttpContext ctx, BlacklistService bl) =>
 {
     if (!await IsAuthorized(ctx))
+    {
+        Log.Warning("Unauthorized blacklist attempt from {Ip}", ctx.Connection.RemoteIpAddress);
         return Results.Unauthorized();
+    }
 
     await bl.AddAsync(ip);
     return Results.Ok();
@@ -174,7 +212,10 @@ app.MapPost("/blacklist/{ip}", async (string ip, HttpContext ctx, BlacklistServi
 app.MapDelete("/blacklist/{ip}", async (string ip, HttpContext ctx, BlacklistService bl) =>
 {
     if (!await IsAuthorized(ctx))
+    {
+        Log.Warning("Unauthorized unblacklist attempt from {Ip}", ctx.Connection.RemoteIpAddress);
         return Results.Unauthorized();
+    }
 
     await bl.RemoveAsync(ip);
     return Results.Ok();
@@ -183,7 +224,10 @@ app.MapDelete("/blacklist/{ip}", async (string ip, HttpContext ctx, BlacklistSer
 app.MapGet("/blacklist", async (HttpContext ctx, BlacklistService bl) =>
 {
     if (!await IsAuthorized(ctx))
+    {
+        Log.Warning("Unauthorized blacklist list attempt from {Ip}", ctx.Connection.RemoteIpAddress);
         return Results.Unauthorized();
+    }
 
     var ips = await bl.ListAsync();
     return Results.Ok(ips);
