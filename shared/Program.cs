@@ -13,11 +13,14 @@ var logPath = Path.Combine(
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
     .WriteTo.Console()
     .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
     .CreateLogger();
 
 builder.Host.UseSerilog();
+builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
+builder.Services.AddHttpContextAccessor();
 var version = Environment.GetEnvironmentVariable("APP_VERSION") ?? "dev";
 Log.Information("=================================================");
 Log.Information("  shared {Version}", version);
@@ -65,6 +68,15 @@ builder.WebHost.ConfigureKestrel(options =>
 var app = builder.Build();
 app.Services.GetRequiredService<TokenService>();
 app.UseForwardedHeaders();
+app.UseSerilogRequestLogging(options =>
+{
+    options.EnrichDiagnosticContext = (diag, ctx) =>
+    {
+        diag.Set("Ip", ctx.Connection.RemoteIpAddress);
+        diag.Set("UserAgent", ctx.Request.Headers.UserAgent.ToString());
+    };
+    options.MessageTemplate = "{RequestMethod} {RequestPath} {StatusCode} {Elapsed:0}ms | {Ip} | {UserAgent}";
+});
 app.UseRateLimiter();
 
 // blacklisting
