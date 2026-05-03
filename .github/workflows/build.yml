@@ -33,4 +33,4 @@ jobs:
             ghcr.io/uncognic/shared:latest
             ghcr.io/uncognic/shared:${{ github.ref_name }}
           build-args: |
-            VERSION=${{ github.ref_name }}
+            VERSION=${{ github.ref_name == '' && 'dev' || github.ref_name }}
