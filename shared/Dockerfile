@@ -21,10 +21,13 @@ RUN dotnet build "./shared.csproj" -c $BUILD_CONFIGURATION -o /app/build
 # This stage is used to publish the service project to be copied to the final stage
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
+ARG VERSION=v1.0.0
 RUN dotnet publish "./shared.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+ARG VERSION=dev
+ENV APP_VERSION=$VERSION
 ENTRYPOINT ["dotnet", "shared.dll"]

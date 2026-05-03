@@ -1,6 +1,6 @@
 services:
   shared:
-    image: shared:latest
+    image: ghcr.io/uncognic/shared:latest
     build:
       context: .
       dockerfile: shared/Dockerfile

@@ -18,6 +18,10 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 builder.Host.UseSerilog();
+var version = Environment.GetEnvironmentVariable("APP_VERSION") ?? "dev";
+Log.Information("=================================================");
+Log.Information("  shared {Version}", version);
+Log.Information("=================================================");
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {

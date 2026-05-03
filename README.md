@@ -2,14 +2,17 @@
 Simple, 0x0.st-like file sharing server.
 
 ## Running
-`docker compose up -d` in the project directory.
+Get the example docker-compose.yml file and edit it as needed, then run:
+```bash
+docker compose up -d
+```
 
 ## Configuration
 Edit the `environment` section in the Docker Compose YML file.
 ```yml
 services:
   shared:
-    image: shared:latest
+    image: ghcr.io/uncognic/shared:latest
     build:
       context: .
       dockerfile: shared/Dockerfile
@@ -23,6 +26,9 @@ services:
       - FileSharing__BaseUrl=https://files.example.com
       - FileSharing__StoragePath=/app/shared
       - FileSharing__MaxFileSizeBytes=524288000
+      - FileSharing__Tokens__0=default
+      - FileSharing__Tokens__1=vrother
+      - FileSharing__Tokens__2=friend
 
 volumes:
   shared:
