@@ -10,6 +10,16 @@ public class TokenService
 {
     private readonly string _connectionString;
     private readonly ILogger<TokenService> _logger;
+    private readonly IConfiguration _config;
+
+    public TokenService(FileService fileService, ILogger<TokenService> logger, IConfiguration config)
+    {
+        _connectionString = fileService.ConnectionString;
+        _logger = logger;
+        _config = config;
+        InitDb();
+        EnsureTokenExists();
+    }
 
     public TokenService(FileService fileService, ILogger<TokenService> logger)
     {
@@ -35,27 +45,35 @@ public class TokenService
 
     private void EnsureTokenExists()
     {
+        var labels = _config.GetSection("FileSharing:Tokens").Get<List<string>>() ?? ["default"];
+
         using var conn = new SqliteConnection(_connectionString);
-        var count = conn.ExecuteScalar<int>("SELECT COUNT(*) FROM Tokens");
-        if (count > 0) return;
 
-        var (plaintext, hash) = GenerateToken();
-
-        conn.Execute("""
-                         INSERT INTO Tokens (Id, Hash, Label, CreatedAt)
-                         VALUES (@Id, @Hash, @Label, @CreatedAt)
-                     """, new
+        foreach (var label in labels)
         {
-            Id = Guid.NewGuid().ToString("N"),
-            Hash = hash,
-            Label = "default",
-            CreatedAt = DateTime.UtcNow.ToString("O")
-        });
+            var exists = conn.ExecuteScalar<int>(
+                "SELECT COUNT(*) FROM Tokens WHERE Label = @Label", new { Label = label });
 
-        _logger.LogWarning("=================================================");
-        _logger.LogWarning("  Generated token: {Token}", plaintext);
-        _logger.LogWarning("  Store this somewhere safe, it won't be shown again.");
-        _logger.LogWarning("=================================================");
+            if (exists > 0) continue; // don't do this if there is already one
+
+            var (plaintext, hash) = GenerateToken();
+
+            conn.Execute("""
+                             INSERT INTO Tokens (Id, Hash, Label, CreatedAt)
+                             VALUES (@Id, @Hash, @Label, @CreatedAt)
+                         """, new
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Hash = hash,
+                Label = label,
+                CreatedAt = DateTime.UtcNow.ToString("O")
+            });
+
+            _logger.LogWarning("=================================================");
+            _logger.LogWarning("  Token '{Label}': {Token}", label, plaintext);
+            _logger.LogWarning("  Store this somewhere safe, it won't be shown again.");
+            _logger.LogWarning("=================================================");
+        }
     }
 
     public async Task<bool> IsValidAsync(string token)

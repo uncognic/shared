@@ -14,6 +14,9 @@ services:
       - FileSharing__BaseUrl=https://files.example.com
       - FileSharing__StoragePath=/app/shared
       - FileSharing__MaxFileSizeBytes=524288000
+      - FileSharing__Tokens__0=default
+      - FileSharing__Tokens__1=vrother
+      - FileSharing__Tokens__2=friend
 
 volumes:
   shared:

@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using shared.Services;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +29,28 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 builder.Services.AddSingleton<FileService>();
 builder.Services.AddSingleton<TokenService>();
 builder.Services.AddSingleton<BlacklistService>();
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("upload", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new() { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+
+    options.AddPolicy("download", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new() { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));
+
+    options.AddPolicy("api", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new() { PermitLimit = 30, Window = TimeSpan.FromMinutes(1) }));
+
+    options.OnRejected = async (ctx, token) =>
+    {
+        Log.Warning("Rate limit exceeded for {Ip} on {Path}",
+            ctx.HttpContext.Connection.RemoteIpAddress, ctx.HttpContext.Request.Path);
+        ctx.HttpContext.Response.StatusCode = 429;
+        await ctx.HttpContext.Response.WriteAsync("Too many requests.", token);
+    };
+});
 builder.Services.AddHostedService<ExpiryService>();
 builder.WebHost.ConfigureKestrel(options =>
 {
@@ -37,6 +61,7 @@ builder.WebHost.ConfigureKestrel(options =>
 var app = builder.Build();
 app.Services.GetRequiredService<TokenService>();
 app.UseForwardedHeaders();
+app.UseRateLimiter();
 
 // blacklisting
 app.Use(async (ctx, next) =>
@@ -113,7 +138,7 @@ app.MapPost("/upload", async (HttpContext ctx, FileService fs) =>
         record.UploadedAt,
         record.ExpiresAt
     });
-});
+}).RequireRateLimiting("upload");
 
 // GET /f/{id}
 
@@ -130,7 +155,7 @@ app.MapGet("/f/{id}", async (string id, FileService fs) =>
 
     var stream = File.OpenRead(filePath);
     return Results.File(stream, record.MimeType, record.OriginalName);
-});
+}).RequireRateLimiting("download");
 
 // GET /list (auth)
 app.MapGet("/list", async (HttpContext ctx, FileService fs) =>
@@ -145,7 +170,7 @@ app.MapGet("/list", async (HttpContext ctx, FileService fs) =>
 
     var files = await fs.ListAsync();
     return Results.Ok(files);
-});
+}).RequireRateLimiting("api");
 
 app.MapDelete("/f/{id}", async (string id, HttpContext ctx, FileService fs) =>
 {
@@ -161,7 +186,7 @@ app.MapDelete("/f/{id}", async (string id, HttpContext ctx, FileService fs) =>
     else
         Log.Warning("Delete 404: {Id}", id);
     return deleted ? Results.Ok() : Results.NotFound();
-});
+}).RequireRateLimiting("api");
 
 // GET / (about?
 app.MapGet("/", () =>
@@ -207,7 +232,7 @@ app.MapPost("/blacklist/{ip}", async (string ip, HttpContext ctx, BlacklistServi
 
     await bl.AddAsync(ip);
     return Results.Ok();
-});
+}).RequireRateLimiting("api");
 
 app.MapDelete("/blacklist/{ip}", async (string ip, HttpContext ctx, BlacklistService bl) =>
 {
@@ -219,7 +244,7 @@ app.MapDelete("/blacklist/{ip}", async (string ip, HttpContext ctx, BlacklistSer
 
     await bl.RemoveAsync(ip);
     return Results.Ok();
-});
+}).RequireRateLimiting("api");
 
 app.MapGet("/blacklist", async (HttpContext ctx, BlacklistService bl) =>
 {
@@ -231,7 +256,7 @@ app.MapGet("/blacklist", async (HttpContext ctx, BlacklistService bl) =>
 
     var ips = await bl.ListAsync();
     return Results.Ok(ips);
-});
+}).RequireRateLimiting("api");
 
 TimeSpan? ParseTtl(string s)
 {

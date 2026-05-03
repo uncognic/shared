@@ -27,6 +27,7 @@ services:
 volumes:
   shared:
 ```
+Or edit appsettings.json directly if you are not using Docker Compose/are running from Visual Studio.
 
 ## Usage
 You can find some basic instructions by cURLing the base URL:
