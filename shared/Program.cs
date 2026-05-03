@@ -13,6 +13,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 builder.Services.AddSingleton<FileService>();
 builder.Services.AddSingleton<TokenService>();
+builder.Services.AddSingleton<BlacklistService>();
 builder.Services.AddHostedService<ExpiryService>();
 builder.WebHost.ConfigureKestrel(options =>
 {
@@ -23,6 +24,27 @@ builder.WebHost.ConfigureKestrel(options =>
 var app = builder.Build();
 app.Services.GetRequiredService<TokenService>();
 app.UseForwardedHeaders();
+
+// blacklisting
+app.Use(async (ctx, next) =>
+{
+    // allow about even if blacklisted
+    if (ctx.Request.Path == "/")
+    {
+        await next();
+        return;
+    }
+
+    var bl = ctx.RequestServices.GetRequiredService<BlacklistService>();
+    var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? string.Empty;
+    if (await bl.IsBlockedAsync(ip))
+    {
+        ctx.Response.StatusCode = 403;
+        return;
+    }
+
+    await next();
+});
 
 // auth
 async Task<bool> IsAuthorized(HttpContext ctx)
@@ -128,8 +150,43 @@ app.MapGet("/", () =>
         $"\n" +
         $"DELETE\n" +
         $"  curl -X DELETE {baseUrl}/f/<id> \\\n" +
-        $"    -H \"Authorization: Bearer <token>\"\n";
+        $"    -H \"Authorization: Bearer <token>\"\n" +
+        $"\n" +
+        $"BLACKLIST\n" +
+        $"  BLACKLISTING \n" +
+        $"      curl -X POST {baseUrl}/blacklist/<ip> -H \"Authorization: Bearer <token>\"\n\n" +
+        $"  UNBLACKLISTING \n" +
+        $"      curl -X DELETE {baseUrl}/blacklist/<ip> -H \"Authorization: Bearer <token>\"\n\n" +
+        $"  LISTING \n" +
+        $"      curl {baseUrl}/blacklist -H \"Authorization: Bearer <token>\" | jq\n";
     return Results.Text(text, "text/plain");
+});
+
+app.MapPost("/blacklist/{ip}", async (string ip, HttpContext ctx, BlacklistService bl) =>
+{
+    if (!await IsAuthorized(ctx))
+        return Results.Unauthorized();
+
+    await bl.AddAsync(ip);
+    return Results.Ok();
+});
+
+app.MapDelete("/blacklist/{ip}", async (string ip, HttpContext ctx, BlacklistService bl) =>
+{
+    if (!await IsAuthorized(ctx))
+        return Results.Unauthorized();
+
+    await bl.RemoveAsync(ip);
+    return Results.Ok();
+});
+
+app.MapGet("/blacklist", async (HttpContext ctx, BlacklistService bl) =>
+{
+    if (!await IsAuthorized(ctx))
+        return Results.Unauthorized();
+
+    var ips = await bl.ListAsync();
+    return Results.Ok(ips);
 });
 
 TimeSpan? ParseTtl(string s)

@@ -54,4 +54,14 @@ LISTING
 DELETE
   curl -X DELETE https://files.example.com/f/<id> \
     -H "Authorization: Bearer <token>"
+
+BLACKLIST
+  BLACKLISTING
+      curl -X POST https://files.example.com/blacklist/<ip> -H "Authorization: Bearer <token>"
+
+  UNBLACKLISTING
+      curl -X DELETE https://files.example.com/blacklist/<ip> -H "Authorization: Bearer <token>"
+
+  LISTING
+      curl https://files.example.com/blacklist -H "Authorization: Bearer <token>" | jq
 ```
