@@ -99,6 +99,11 @@ async Task<bool> IsAuthorized(HttpContext ctx)
     return await tokenService.IsValidAsync(token);
 }
 
+// fuck clankers
+app.MapGet("/robots.txt", () => Results.Text(
+    "User-agent: *\nDisallow: /\n",
+    "text/plain"));
+
 // POST /upload
 
 app.MapPost("/upload", async (HttpContext ctx, FileService fs, TokenService tokenService) =>
