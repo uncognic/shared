@@ -41,19 +41,20 @@ You can find some basic instructions by cURLing the base URL:
 curl https://shared.example.com
 ```
 ```
-shared - simple file sharing
+shared <dev> - simple file sharing
 inspired by the great 0x0.st
 
 licensed under the GNU AGPL v3 license <https://fsf.org/>
 https://github.com/uncognic/shared
 
+windows users: use curl.exe instead of curl
 UPLOAD (remove ?ttl= for no expiry)
   curl -X POST https://files.example.com/upload?ttl=<N[s|m|h|d]> \
     -H "Authorization: Bearer <token>" \
     -F "file=@/path/to/file" | jq
 
 DOWNLOAD
-  curl https://files.example.com/f/<id>
+  curl https://files.example.com/f/<id> -o <output_file>
 
 LISTING
   curl https://files.example.com/list -H "Authorization: Bearer <token>" | jq
@@ -63,12 +64,12 @@ DELETE
     -H "Authorization: Bearer <token>"
 
 BLACKLIST
-  BLACKLISTING
+  BLACKLISTING 
       curl -X POST https://files.example.com/blacklist/<ip> -H "Authorization: Bearer <token>"
 
-  UNBLACKLISTING
+  UNBLACKLISTING 
       curl -X DELETE https://files.example.com/blacklist/<ip> -H "Authorization: Bearer <token>"
 
-  LISTING
+  LISTING 
       curl https://files.example.com/blacklist -H "Authorization: Bearer <token>" | jq
 ```

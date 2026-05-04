@@ -216,18 +216,19 @@ app.MapGet("/", () =>
 {
     var baseUrl = app.Configuration["FileSharing:BaseUrl"]?.TrimEnd('/') ?? "https://example.com";
     var text =
-        $"shared - simple file sharing\n" +
+        $"shared <{version}> - simple file sharing\n" +
         $"inspired by the great 0x0.st\n\n" +
         $"licensed under the GNU AGPL v3 license <https://fsf.org/>\n" +
         $"https://github.com/uncognic/shared\n" +
         $"\n" +
+        $"windows users: use curl.exe instead of curl\n" +
         $"UPLOAD (remove ?ttl= for no expiry)\n" +
         $"  curl -X POST {baseUrl}/upload?ttl=<N[s|m|h|d]> \\\n" +
         $"    -H \"Authorization: Bearer <token>\" \\\n" +
         $"    -F \"file=@/path/to/file\" | jq\n" +
         $"\n" +
         $"DOWNLOAD\n" +
-        $"  curl {baseUrl}/f/<id>\n\n" +
+        $"  curl {baseUrl}/f/<id> -o <output_file>\n\n" +
         $"LISTING\n" +
         $"  curl {baseUrl}/list -H \"Authorization: Bearer <token>\" | jq\n"+
         $"\n" +
