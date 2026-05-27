@@ -10,28 +10,28 @@ docker compose up -d
 ## Configuration
 Edit the `environment` section in the Docker Compose YML file.
 ```yml
-services:
+sservices:
   shared:
     image: ghcr.io/uncognic/shared:latest
     build:
       context: .
-      dockerfile: shared/Dockerfile
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
       - "8080:8080"
     volumes:
       - shared:/app/shared
     environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - FileSharing__BaseUrl=https://files.example.com
-      - FileSharing__StoragePath=/app/shared
-      - FileSharing__MaxFileSizeBytes=524288000
-      - FileSharing__Tokens__0=default
-      - FileSharing__Tokens__1=vrother
-      - FileSharing__Tokens__2=friend
+      FILE_SHARING_BASE_URL: https://files.example.com
+      FILE_SHARING_STORAGE_PATH: /app/shared
+      FILE_SHARING_MAX_FILE_SIZE_BYTES: 524288000
+      FILE_SHARING_TOKENS_0: default
+      # FILE_SHARING_TOKENS_1: another-token
+      # FILE_SHARING_TOKENS_2: yet-another-token
 
 volumes:
   shared:
+
 ```
 Or edit appsettings.json directly if you are not using Docker Compose/are running from Visual Studio.
 
