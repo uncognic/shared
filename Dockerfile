@@ -9,11 +9,10 @@ RUN ./gradlew bootJar --no-daemon
 
 FROM eclipse-temurin:21-jre-alpine AS final
 WORKDIR /app
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN apk add --no-cache su-exec && \
+    addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=build /app/build/libs/*.jar app.jar
-RUN mkdir -p /app/shared && chown -R appuser:appgroup /app/shared
-USER appuser
 ARG VERSION=dev
 ENV APP_VERSION=$VERSION
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "mkdir -p /app/shared/logs && chown -R appuser:appgroup /app/shared && exec su-exec appuser java -jar /app/app.jar"]
