@@ -165,7 +165,7 @@ app.MapPost("/upload", async (HttpContext ctx, FileService fs, TokenService toke
 
 // GET /f/{id}
 
-app.MapGet("/f/{id}", async (string id, FileService fs) =>
+app.MapGet("/f/{id}", async (string id, HttpContext ctx, FileService fs) =>
 {
     var (record, filePath) = await fs.GetAsync(id);
 
@@ -174,11 +174,31 @@ app.MapGet("/f/{id}", async (string id, FileService fs) =>
         Log.Warning("Download 404: {Id}", id);
         return Results.NotFound();
     }
-    Log.Information("Download: {Id} ({OriginalName})", record.Id, record.OriginalName);
+
+    var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    await fs.RecordDownloadAsync(record.Id, ip);
+    Log.Information("Download: {Id} ({OriginalName}) by {Ip}", record.Id, record.OriginalName, ip);
+
+    var forceDownload = ctx.Request.Query.ContainsKey("dl");
+    var inline = !forceDownload && IsPreviewable(record.MimeType);
 
     var stream = File.OpenRead(filePath);
+    if (inline)
+    {
+        ctx.Response.Headers.ContentDisposition = $"inline; filename=\"{record.OriginalName}\"";
+        return Results.File(stream, record.MimeType);
+    }
     return Results.File(stream, record.MimeType, record.OriginalName);
 }).RequireRateLimiting("download");
+
+app.MapGet("/f/{id}/info", async (string id, HttpContext ctx, FileService fs) =>
+{
+    if (!await IsAuthorized(ctx))
+        return Results.Unauthorized();
+
+    var record = await fs.GetInfoAsync(id);
+    return record is null ? Results.NotFound() : Results.Ok(record);
+}).RequireRateLimiting("api");
 
 // GET /list (auth)
 app.MapGet("/list", async (HttpContext ctx, FileService fs) =>
@@ -227,9 +247,11 @@ app.MapGet("/", () =>
         $"    -H \"Authorization: Bearer <token>\" \\\n" +
         $"    -F \"file=@/path/to/file\" | jq\n" +
         $"\n" +
-        $"DOWNLOAD\n" +
+        $"DOWNLOAD (add ?dl to force download (not inline)\n" +
         $"  curl {baseUrl}/f/<id> -o <output_file>\n\n" +
-        $"LISTING\n" +
+        $"FILE INFO (includes download history with IPs)\n" +
+        $"  curl {baseUrl}/f/<id>/info -H \"Authorization: Bearer <token>\" | jq\n\n" +
+        $"LISTING (includes download counts)\n" +
         $"  curl {baseUrl}/list -H \"Authorization: Bearer <token>\" | jq\n"+
         $"\n" +
         $"DELETE\n" +
@@ -297,5 +319,11 @@ TimeSpan? ParseTtl(string s)
     };
 }
 
+bool IsPreviewable(string mimeType) =>
+    mimeType.StartsWith("image/") ||
+    mimeType.StartsWith("text/") ||
+    mimeType.StartsWith("video/") ||
+    mimeType.StartsWith("audio/") ||
+    mimeType is "application/pdf";
 
 app.Run();

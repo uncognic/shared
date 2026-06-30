@@ -35,6 +35,15 @@ public class FileService
             TokenLabel TEXT NOT NULL DEFAULT '')
             """);
 
+        connection.Execute("""
+            CREATE TABLE IF NOT EXISTS Downloads (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            FileId TEXT NOT NULL,
+            Ip TEXT NOT NULL,
+            DownloadedAt TEXT NOT NULL,
+            FOREIGN KEY (FileId) REFERENCES Files(Id) ON DELETE CASCADE)
+            """);
+
     }
 
     public async Task<FileRecord> SaveAsync(IFormFile file, string uploaderIp, string tokenLabel, TimeSpan? ttl = null)
@@ -83,23 +92,41 @@ public class FileService
         using var connection = new SqliteConnection(ConnectionString);
         var record = await connection.QuerySingleOrDefaultAsync<FileRecord>("SELECT * FROM Files WHERE Id = @Id", new { Id = id });
         if (record is null)
-        { 
             return (null, null);
-        }
 
         if (record.ExpiresAt.HasValue && record.ExpiresAt.Value <= DateTime.UtcNow)
-        {
             return (null, null);
-        }
-        
+
         var filePath = Path.Combine(_storage_path, id);
         return File.Exists(filePath) ? (record, filePath) : (null, null);
+    }
+
+    public async Task<FileRecord?> GetInfoAsync(string id)
+    {
+        using var connection = new SqliteConnection(ConnectionString);
+        var record = await connection.QuerySingleOrDefaultAsync<FileRecord>("SELECT * FROM Files WHERE Id = @Id", new { Id = id });
+        if (record is null)
+            return null;
+
+        record.Downloads = (await connection.QueryAsync<Download>(
+            "SELECT Ip, DownloadedAt FROM Downloads WHERE FileId = @Id ORDER BY DownloadedAt DESC",
+            new { Id = id })).ToList();
+        record.DownloadCount = record.Downloads.Count;
+
+        return record;
     }
 
     public async Task<IEnumerable<FileRecord>> ListAsync()
     {
         using var connection = new SqliteConnection(ConnectionString);
-        return await connection.QueryAsync<FileRecord>("SELECT * FROM Files ORDER BY UploadedAt DESC");
+        var files = (await connection.QueryAsync<FileRecord>("""
+            SELECT f.*, COUNT(d.Id) AS DownloadCount
+            FROM Files f LEFT JOIN Downloads d ON f.Id = d.FileId
+            GROUP BY f.Id
+            ORDER BY f.UploadedAt DESC
+            """)).ToList();
+
+        return files;
     }
 
     public async Task<bool> DeleteAsync(string id)
@@ -117,6 +144,15 @@ public class FileService
 
         await conn.ExecuteAsync("DELETE FROM Files WHERE Id = @Id", new { Id = id });
         return true;
+    }
+
+    public async Task RecordDownloadAsync(string fileId, string ip)
+    {
+        using var conn = new SqliteConnection(ConnectionString);
+        await conn.ExecuteAsync("""
+            INSERT INTO Downloads (FileId, Ip, DownloadedAt)
+            VALUES (@FileId, @Ip, @DownloadedAt)
+            """, new { FileId = fileId, Ip = ip, DownloadedAt = DateTime.UtcNow.ToString("O") });
     }
 
     public async Task<int> DeleteExpiredAsync()
