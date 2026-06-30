@@ -16,6 +16,7 @@ public class FileRecord
 
 public class Download
 {
+    [System.Text.Json.Serialization.JsonIgnore]
     public string FileId { get; set; } = string.Empty;
     public string Ip { get; set; } = string.Empty;
     public DateTime DownloadedAt { get; set; }
