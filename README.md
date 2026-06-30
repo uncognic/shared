@@ -36,6 +36,8 @@ volumes:
 Or edit appsettings.json directly if you are not using Docker Compose/are running from Visual Studio.
 
 ## Usage
+There is a CLI application that makes the usage easier: https://github.com/dacixn/shared-cli
+
 You can find some basic instructions by cURLing the base URL:
 ```bash
 curl https://shared.example.com
