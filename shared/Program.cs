@@ -257,12 +257,12 @@ app.MapGet("/", () =>
         $"\n" +
         $"DOWNLOAD (add ?dl to force download (not inline)\n" +
         $"  curl {baseUrl}/f/<id> -o <output_file>\n\n" +
-        $"FILE INFO (includes download history with IPs)\n" +
+        $"FILE INFO\n" +
         $"  curl {baseUrl}/f/<id>/info -H \"Authorization: Bearer <token>\" | jq\n\n" +
         $"LISTING (includes download counts)\n" +
         $"  curl {baseUrl}/list -H \"Authorization: Bearer <token>\" | jq\n"+
         $"\n" +
-        $"STATS (total files, bytes, downloads, breakdown by token)\n" +
+        $"STATS\n" +
         $"  curl {baseUrl}/stats -H \"Authorization: Bearer <token>\" | jq\n" +
         $"\n" +
         $"DELETE\n" +
