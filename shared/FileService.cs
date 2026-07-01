@@ -146,6 +146,22 @@ public class FileService
         return true;
     }
 
+    public async Task<object> GetStatsAsync()
+    {
+        using var conn = new SqliteConnection(ConnectionString);
+        var totalFiles = await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM Files");
+        var totalBytes = await conn.ExecuteScalarAsync<long>("SELECT COALESCE(SUM(SizeBytes), 0) FROM Files");
+        var totalDownloads = await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM Downloads");
+        var filesByToken = await conn.QueryAsync("SELECT TokenLabel, COUNT(*) AS FileCount, SUM(SizeBytes) AS TotalBytes FROM Files GROUP BY TokenLabel");
+        return new
+        {
+            TotalFiles = totalFiles,
+            TotalBytes = totalBytes,
+            TotalDownloads = totalDownloads,
+            ByToken = filesByToken
+        };
+    }
+
     public async Task RecordDownloadAsync(string fileId, string ip)
     {
         using var conn = new SqliteConnection(ConnectionString);

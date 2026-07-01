@@ -200,6 +200,14 @@ app.MapGet("/f/{id}/info", async (string id, HttpContext ctx, FileService fs) =>
     return record is null ? Results.NotFound() : Results.Ok(record);
 }).RequireRateLimiting("api");
 
+app.MapGet("/stats", async (HttpContext ctx, FileService fs) =>
+{
+    if (!await IsAuthorized(ctx))
+        return Results.Unauthorized();
+
+    return Results.Ok(await fs.GetStatsAsync());
+}).RequireRateLimiting("api");
+
 // GET /list (auth)
 app.MapGet("/list", async (HttpContext ctx, FileService fs) =>
 {
@@ -253,6 +261,9 @@ app.MapGet("/", () =>
         $"  curl {baseUrl}/f/<id>/info -H \"Authorization: Bearer <token>\" | jq\n\n" +
         $"LISTING (includes download counts)\n" +
         $"  curl {baseUrl}/list -H \"Authorization: Bearer <token>\" | jq\n"+
+        $"\n" +
+        $"STATS (total files, bytes, downloads, breakdown by token)\n" +
+        $"  curl {baseUrl}/stats -H \"Authorization: Bearer <token>\" | jq\n" +
         $"\n" +
         $"DELETE\n" +
         $"  curl -X DELETE {baseUrl}/f/<id> \\\n" +
